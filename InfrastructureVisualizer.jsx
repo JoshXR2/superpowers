@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 
 // ─── Color Palette ───────────────────────────────────────────────
 const C = {
@@ -17,21 +17,6 @@ const C = {
 const styleSheet = `
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap');
 
-@keyframes packetLeftUp {
-  0% { offset-distance: 0%; opacity: 0; }
-  5% { opacity: 1; }
-  90% { opacity: 1; }
-  100% { offset-distance: 100%; opacity: 0; }
-}
-
-@keyframes packetRightIn {
-  0% { offset-distance: 0%; opacity: 0; }
-  5% { opacity: 1; }
-  45% { offset-distance: 50%; }
-  90% { opacity: 1; }
-  100% { offset-distance: 100%; opacity: 0; }
-}
-
 @keyframes pulseWhite {
   0%, 100% { box-shadow: 0 0 0 0 rgba(240,240,245,0.3); }
   50% { box-shadow: 0 0 16px 6px rgba(240,240,245,0.12); }
@@ -47,24 +32,18 @@ const styleSheet = `
   50% { box-shadow: 0 0 18px 6px rgba(212,137,26,0.2); }
 }
 
-@keyframes perimeterGlow {
-  0%, 100% { box-shadow: 0 0 8px 1px rgba(192,122,43,0.3), inset 0 0 8px 1px rgba(192,122,43,0.08); }
-  50% { box-shadow: 0 0 20px 4px rgba(192,122,43,0.45), inset 0 0 12px 2px rgba(192,122,43,0.12); }
-}
-
-@keyframes boundaryFlash {
-  0%, 60%, 100% { opacity: 0.6; }
-  30% { opacity: 1; }
-}
-
 @keyframes dotGrid {
   0%, 100% { opacity: 0.03; }
   50% { opacity: 0.06; }
 }
 
-@keyframes fadeCounter {
-  0%, 80% { opacity: 1; }
-  90%, 100% { opacity: 0.6; }
+@media (max-width: 768px) {
+  .iv-canvas {
+    flex-direction: column !important;
+  }
+  .iv-divider {
+    display: none !important;
+  }
 }
 `;
 
@@ -121,23 +100,47 @@ const LockIcon = ({ color = C.packetAmber, size = 16 }) => (
   </svg>
 );
 
+// ─── Shared SVG Filter Definitions ───────────────────────────────
+const SvgFilters = () => (
+  <defs>
+    <filter id="glowRed" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur" />
+      <feFlood floodColor={C.packetRed} floodOpacity="0.5" />
+      <feComposite in2="blur" operator="in" result="colorBlur" />
+      <feMerge>
+        <feMergeNode in="colorBlur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+    <filter id="glowAmber" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blur" />
+      <feFlood floodColor={C.packetAmber} floodOpacity="0.45" />
+      <feComposite in2="blur" operator="in" result="colorBlur" />
+      <feMerge>
+        <feMergeNode in="colorBlur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+    <filter id="glowAmberWide" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur" />
+      <feFlood floodColor={C.amber} floodOpacity="0.35" />
+      <feComposite in2="blur" operator="in" result="colorBlur" />
+      <feMerge>
+        <feMergeNode in="colorBlur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+);
+
 // ─── Tooltip Component ───────────────────────────────────────────
 const Tooltip = ({ text, children, style = {} }) => {
   const [show, setShow] = useState(false);
-  const [pos, setPos] = useState({ x: 0, y: 0 });
-  const ref = useRef(null);
-
-  const handleEnter = (e) => {
-    const rect = ref.current.getBoundingClientRect();
-    setPos({ x: rect.width / 2, y: -8 });
-    setShow(true);
-  };
 
   return (
     <div
-      ref={ref}
       style={{ position: 'relative', ...style }}
-      onMouseEnter={handleEnter}
+      onMouseEnter={() => setShow(true)}
       onMouseLeave={() => setShow(false)}
     >
       {children}
@@ -168,23 +171,29 @@ const Tooltip = ({ text, children, style = {} }) => {
   );
 };
 
-// ─── Animated Packets ────────────────────────────────────────────
-const Packets = ({ pathId, color, count = 4, duration = 4, animName }) => {
+// ─── Animated Packets (SVG animateMotion) ────────────────────────
+const Packets = ({ pathId, color, count = 4, duration = 4 }) => {
   const packets = [];
   for (let i = 0; i < count; i++) {
+    const delay = `${(i * duration) / count}s`;
     packets.push(
-      <circle
-        key={i}
-        r="4"
-        fill={color}
-        style={{
-          offsetPath: `url(#${pathId})`,
-          animation: `${animName} ${duration}s linear infinite`,
-          animationDelay: `${(i * duration) / count}s`,
-          opacity: 0,
-          filter: `drop-shadow(0 0 4px ${color})`,
-        }}
-      />
+      <circle key={i} r="4" fill={color} opacity="0" filter={`drop-shadow(0 0 4px ${color})`}>
+        <animateMotion
+          dur={`${duration}s`}
+          repeatCount="indefinite"
+          begin={delay}
+        >
+          <mpath href={`#${pathId}`} />
+        </animateMotion>
+        <animate
+          attributeName="opacity"
+          values="0;1;1;0"
+          keyTimes="0;0.05;0.9;1"
+          dur={`${duration}s`}
+          repeatCount="indefinite"
+          begin={delay}
+        />
+      </circle>
     );
   }
   return <>{packets}</>;
@@ -194,7 +203,7 @@ const Packets = ({ pathId, color, count = 4, duration = 4, animName }) => {
 const ExposureCounter = () => {
   const [count, setCount] = useState(1247);
   useEffect(() => {
-    const id = setInterval(() => setCount(c => c + 1), 800);
+    const id = setInterval(() => setCount(c => c + 1), 1000);
     return () => clearInterval(id);
   }, []);
   return (
@@ -205,7 +214,7 @@ const ExposureCounter = () => {
         fontWeight: 700,
         color: C.packetRed,
         letterSpacing: 2,
-        textShadow: `0 0 12px rgba(231,76,60,0.4)`,
+        textShadow: '0 0 12px rgba(231,76,60,0.4)',
       }}>
         {count.toLocaleString()}
       </div>
@@ -236,7 +245,7 @@ const SecureIndicator = () => (
       fontWeight: 700,
       color: C.packetAmber,
       letterSpacing: 2,
-      textShadow: `0 0 12px rgba(212,137,26,0.3)`,
+      textShadow: '0 0 12px rgba(212,137,26,0.3)',
     }}>
       0
     </div>
@@ -275,7 +284,19 @@ const StatusBadge = ({ danger, text }) => (
   </div>
 );
 
+// ─── Overlay Node Positioning Helper ─────────────────────────────
+// Converts SVG viewBox coordinates to percentage positions
+// ViewBox: 0 0 360 300
+const svgPos = (x, y) => ({
+  position: 'absolute',
+  left: `${(x / 360) * 100}%`,
+  top: `${(y / 300) * 100}%`,
+  transform: 'translate(-50%, -50%)',
+});
+
 // ─── Left Panel (Traditional Cloud) ─────────────────────────────
+const LEFT_PATH = 'M180 260 C180 220 130 190 140 160 C150 130 180 100 180 70';
+
 const LeftPanel = () => (
   <div style={{
     flex: 1,
@@ -299,34 +320,72 @@ const LeftPanel = () => (
       Traditional Cloud AI
     </div>
 
-    {/* SVG Canvas */}
-    <div style={{ position: 'relative', width: '100%', height: 300 }}>
-      <svg width="100%" height="100%" viewBox="0 0 360 300" preserveAspectRatio="xMidYMid meet">
+    {/* SVG Canvas with HTML Overlays */}
+    <div style={{ position: 'relative', width: '100%', aspectRatio: '6 / 5' }}>
+      <svg
+        width="100%"
+        height="100%"
+        viewBox="0 0 360 300"
+        preserveAspectRatio="xMidYMid meet"
+        style={{ position: 'absolute', inset: 0 }}
+      >
+        <SvgFilters />
         <defs>
-          <path id="leftPath" d="M180 260 L180 160 L180 80" fill="none" />
+          <path id="leftPath" d={LEFT_PATH} fill="none" />
         </defs>
 
-        {/* Data path line */}
-        <path d="M180 260 L180 160 L180 80" stroke={C.border} strokeWidth="1.5" fill="none" strokeDasharray="4 4" opacity="0.5" />
+        {/* Visible data path line */}
+        <path
+          d={LEFT_PATH}
+          stroke={C.border}
+          strokeWidth="1.5"
+          fill="none"
+          strokeDasharray="4 4"
+          opacity="0.5"
+        />
 
         {/* Boundary line */}
-        <line x1="40" y1="160" x2="320" y2="160" stroke={C.packetRed} strokeWidth="1" strokeDasharray="8 4" opacity="0.6" style={{ animation: 'boundaryFlash 4s ease infinite' }} />
+        <line
+          x1="30" y1="160" x2="330" y2="160"
+          stroke={C.packetRed}
+          strokeWidth="1"
+          strokeDasharray="8 4"
+          opacity="0.6"
+        >
+          <animate
+            attributeName="opacity"
+            values="0.4;1;0.4"
+            keyTimes="0;0.375;1"
+            dur="4s"
+            repeatCount="indefinite"
+          />
+        </line>
+
+        {/* Boundary label background */}
         <rect x="110" y="148" width="140" height="20" rx="3" fill={C.bg} stroke={C.packetRed} strokeWidth="0.8" opacity="0.9" />
         <text x="180" y="162" textAnchor="middle" fill={C.packetRed} fontSize="9" fontFamily="IBM Plex Mono, monospace" fontWeight="600" letterSpacing="2">
           UNCONTROLLED BOUNDARY
         </text>
 
-        {/* Animated packets */}
-        <Packets pathId="leftPath" color={C.packetRed} count={4} duration={4} animName="packetLeftUp" />
+        {/* Cloud node SVG glow circle */}
+        <circle cx="180" cy="55" r="30" fill={C.packetRed} opacity="0.08" filter="url(#glowRed)">
+          <animate
+            attributeName="opacity"
+            values="0.05;0.18;0.05"
+            keyTimes="0;0.625;1"
+            dur="4s"
+            repeatCount="indefinite"
+          />
+        </circle>
 
-        {/* Cloud node glow background */}
-        <circle cx="180" cy="55" r="32" fill="none" stroke={C.packetRed} strokeWidth="0.5" opacity="0.15" style={{ animation: 'pulseRed 4s ease infinite' }} />
+        {/* Animated packets */}
+        <Packets pathId="leftPath" color={C.packetRed} count={4} duration={4} />
       </svg>
 
-      {/* Business Node */}
+      {/* Business Node (HTML overlay) — SVG coord: 180, 260 */}
       <Tooltip
         text="Your internal data originates here and is sent to external cloud infrastructure for AI processing."
-        style={{ position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)' }}
+        style={svgPos(180, 258)}
       >
         <div style={{
           display: 'flex',
@@ -344,14 +403,15 @@ const LeftPanel = () => (
             marginTop: 2,
             textTransform: 'uppercase',
             letterSpacing: 1,
+            whiteSpace: 'nowrap',
           }}>Your Business</div>
         </div>
       </Tooltip>
 
-      {/* Cloud Node */}
+      {/* Cloud Node (HTML overlay) — SVG coord: 180, 55 */}
       <Tooltip
         text="Your data is stored and processed on infrastructure owned and operated by third parties. You have no visibility or control over who can access it."
-        style={{ position: 'absolute', top: 4, left: '50%', transform: 'translateX(-50%)' }}
+        style={svgPos(180, 48)}
       >
         <div style={{
           display: 'flex',
@@ -368,6 +428,7 @@ const LeftPanel = () => (
             color: C.red,
             textTransform: 'uppercase',
             letterSpacing: 1,
+            whiteSpace: 'nowrap',
           }}>3rd-Party Cloud</div>
           <div style={{
             fontFamily: "'Inter', sans-serif",
@@ -388,6 +449,9 @@ const LeftPanel = () => (
 );
 
 // ─── Right Panel (CubCloud Sovereign) ───────────────────────────
+const RIGHT_PATH_A = 'M180 260 L180 195 C180 170 120 155 120 125';
+const RIGHT_PATH_B = 'M180 260 L180 195 C180 170 240 155 240 125';
+
 const RightPanel = () => (
   <div style={{
     flex: 1,
@@ -411,31 +475,74 @@ const RightPanel = () => (
       CubCloud Sovereign AI
     </div>
 
-    {/* SVG Canvas */}
-    <div style={{ position: 'relative', width: '100%', height: 300 }}>
-      <svg width="100%" height="100%" viewBox="0 0 360 300" preserveAspectRatio="xMidYMid meet">
+    {/* SVG Canvas with HTML Overlays */}
+    <div style={{ position: 'relative', width: '100%', aspectRatio: '6 / 5' }}>
+      <svg
+        width="100%"
+        height="100%"
+        viewBox="0 0 360 300"
+        preserveAspectRatio="xMidYMid meet"
+        style={{ position: 'absolute', inset: 0 }}
+      >
+        <SvgFilters />
         <defs>
-          <path id="rightPath" d="M180 260 L180 180 L120 120 L180 60 L240 120 L180 180" fill="none" />
+          <path id="rightPathA" d={RIGHT_PATH_A} fill="none" />
+          <path id="rightPathB" d={RIGHT_PATH_B} fill="none" />
         </defs>
 
-        {/* Data path line */}
-        <path d="M180 260 L180 180 L120 120 L180 60 L240 120 L180 180" stroke={C.border} strokeWidth="1.5" fill="none" strokeDasharray="4 4" opacity="0.5" />
+        {/* Sovereign Perimeter — outer glow rect */}
+        <rect
+          x="55" y="50" width="250" height="160" rx="6"
+          fill="none"
+          stroke={C.amber}
+          strokeWidth="2"
+          filter="url(#glowAmberWide)"
+          opacity="0.6"
+        >
+          <animate
+            attributeName="opacity"
+            values="0.4;0.8;0.4"
+            dur="4s"
+            repeatCount="indefinite"
+          />
+        </rect>
+        {/* Sovereign Perimeter — crisp inner border */}
+        <rect
+          x="55" y="50" width="250" height="160" rx="6"
+          fill="none"
+          stroke={C.amber}
+          strokeWidth="1.5"
+          opacity="0.8"
+        />
 
-        {/* Sovereign Perimeter */}
-        <rect x="60" y="40" width="240" height="170" rx="6" fill="none" stroke={C.amber} strokeWidth="1.5" style={{ animation: 'perimeterGlow 4s ease infinite' }} />
-        <rect x="108" y="32" width="144" height="18" rx="3" fill={C.bg} stroke={C.amber} strokeWidth="0.8" />
-        <text x="180" y="44" textAnchor="middle" fill={C.packetAmber} fontSize="9" fontFamily="IBM Plex Mono, monospace" fontWeight="600" letterSpacing="2">
+        {/* Perimeter label */}
+        <rect x="108" y="42" width="144" height="18" rx="3" fill={C.bg} stroke={C.amber} strokeWidth="0.8" />
+        <text x="180" y="54" textAnchor="middle" fill={C.packetAmber} fontSize="9" fontFamily="IBM Plex Mono, monospace" fontWeight="600" letterSpacing="2">
           SOVEREIGN BOUNDARY
         </text>
 
-        {/* Animated packets */}
-        <Packets pathId="rightPath" color={C.packetAmber} count={4} duration={4} animName="packetRightIn" />
+        {/* Visible data path lines */}
+        <path d={RIGHT_PATH_A} stroke={C.border} strokeWidth="1.5" fill="none" strokeDasharray="4 4" opacity="0.5" />
+        <path d={RIGHT_PATH_B} stroke={C.border} strokeWidth="1.5" fill="none" strokeDasharray="4 4" opacity="0.5" />
+
+        {/* GPU glow circles */}
+        <circle cx="120" cy="120" r="24" fill={C.packetAmber} opacity="0.06" filter="url(#glowAmber)">
+          <animate attributeName="opacity" values="0.04;0.15;0.04" keyTimes="0;0.625;1" dur="4s" repeatCount="indefinite" />
+        </circle>
+        <circle cx="240" cy="120" r="24" fill={C.packetAmber} opacity="0.06" filter="url(#glowAmber)">
+          <animate attributeName="opacity" values="0.04;0.15;0.04" keyTimes="0;0.625;1" dur="4s" repeatCount="indefinite" begin="0.5s" />
+        </circle>
+
+        {/* Animated packets — branch A (to GPU 1) */}
+        <Packets pathId="rightPathA" color={C.packetAmber} count={3} duration={4} />
+        {/* Animated packets — branch B (to GPU 2) */}
+        <Packets pathId="rightPathB" color={C.packetAmber} count={3} duration={4} />
       </svg>
 
-      {/* Business Node */}
+      {/* Business Node (HTML overlay) — SVG coord: 180, 260 */}
       <Tooltip
         text="Your internal data is sent for AI processing but never leaves CubCloud's sovereign perimeter."
-        style={{ position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)' }}
+        style={svgPos(180, 258)}
       >
         <div style={{
           display: 'flex',
@@ -453,14 +560,15 @@ const RightPanel = () => (
             marginTop: 2,
             textTransform: 'uppercase',
             letterSpacing: 1,
+            whiteSpace: 'nowrap',
           }}>Your Business</div>
         </div>
       </Tooltip>
 
-      {/* GPU Node 1 */}
+      {/* GPU Node 1 (HTML overlay) — SVG coord: 120, 120 */}
       <Tooltip
         text="Processing happens entirely on CubCloud-owned NVIDIA GPU infrastructure located in Missoula, Montana. Your data never leaves your defined perimeter."
-        style={{ position: 'absolute', top: 72, left: 'calc(50% - 90px)', transform: 'translateX(-50%)' }}
+        style={svgPos(120, 120)}
       >
         <div style={{
           display: 'flex',
@@ -477,14 +585,15 @@ const RightPanel = () => (
             color: C.amber,
             textTransform: 'uppercase',
             letterSpacing: 1,
+            whiteSpace: 'nowrap',
           }}>H200 SXM5</div>
         </div>
       </Tooltip>
 
-      {/* GPU Node 2 */}
+      {/* GPU Node 2 (HTML overlay) — SVG coord: 240, 120 */}
       <Tooltip
         text="Processing happens entirely on CubCloud-owned NVIDIA GPU infrastructure located in Missoula, Montana. Your data never leaves your defined perimeter."
-        style={{ position: 'absolute', top: 72, left: 'calc(50% + 90px)', transform: 'translateX(-50%)' }}
+        style={svgPos(240, 120)}
       >
         <div style={{
           display: 'flex',
@@ -502,6 +611,7 @@ const RightPanel = () => (
             color: C.amber,
             textTransform: 'uppercase',
             letterSpacing: 1,
+            whiteSpace: 'nowrap',
           }}>H100 SXM5</div>
         </div>
       </Tooltip>
@@ -517,7 +627,7 @@ const RightPanel = () => (
 
 // ─── Center Divider ──────────────────────────────────────────────
 const CenterDivider = () => (
-  <div style={{
+  <div className="iv-divider" style={{
     width: 1,
     background: `linear-gradient(to bottom, transparent, ${C.border}, transparent)`,
     position: 'relative',
@@ -664,7 +774,7 @@ const InfrastructureVisualizer = () => {
       </div>
 
       {/* Visualizer Canvas */}
-      <div style={{
+      <div className="iv-canvas" style={{
         display: 'flex',
         position: 'relative',
         zIndex: 1,
@@ -716,13 +826,6 @@ const InfrastructureVisualizer = () => {
           Learn how CubCloud keeps your AI on your terms &rarr;
         </a>
       </div>
-
-      {/* Responsive: stack below 768px */}
-      <style>{`
-        @media (max-width: 768px) {
-          .iv-canvas { flex-direction: column !important; }
-        }
-      `}</style>
     </div>
   );
 };
